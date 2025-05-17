@@ -89,10 +89,11 @@ async def proxy_endpoint(request: Request, path: str):
         headers = dict(request.headers)
         headers.pop("host", None)
         
+        headers["Accept-Encoding"] = "gzip, deflate"
+        
         body = None
         if request.method in ["POST", "PUT", "PATCH"]:
             body = await request.body()
-            
         
         response = await http_client.request(
             method=request.method,
@@ -103,6 +104,8 @@ async def proxy_endpoint(request: Request, path: str):
         )
         
         response_headers = dict(response.headers)
+        
+        response_headers.pop("content-encoding", None)
         
         if ENABLE_CACHE and request.method == "GET" and response.status_code == 200:
             cache_key = generate_cache_key(request, path)
