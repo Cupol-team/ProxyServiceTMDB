@@ -25,6 +25,7 @@ app = FastAPI(
 router = APIRouter(prefix="/TMDBProxy")
 
 TARGET_API_BASE_URL = os.getenv("TARGET_API_BASE_URL", "https://api.themoviedb.org/3")
+TARGET_IMAGE_API_BASE_URL = os.getenv("TARGET_IMAGE_API_BASE_URL", "https://image.tmdb.org/t/p")
 ENABLE_CACHE = os.getenv("ENABLE_CACHE", "true").lower() == "true"
 CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
 CACHE_CLEANUP_INTERVAL = int(os.getenv("CACHE_CLEANUP_INTERVAL", "60"))
@@ -63,6 +64,65 @@ async def cache_stats():
     if not ENABLE_CACHE:
         return {"status": "disabled"}
     return cache.get_stats()
+
+@router.api_route("/images/{path:path}", methods=["GET"])
+async def proxy_image_endpoint(request: Request, path: str):
+    """
+    Прокси-эндпоинт для изображений TMDB
+    """
+    try:
+        if ENABLE_CACHE and request.method == "GET":
+            cache_key = generate_cache_key(request, f"images/{path}")
+            cached_response = cache.get(cache_key)
+            
+            if cached_response:
+                content, status_code, headers = cached_response
+                return Response(
+                    content=content,
+                    status_code=status_code,
+                    headers=headers,
+                )
+        
+        target_url = f"{TARGET_IMAGE_API_BASE_URL}/{path}"
+        
+        params = dict(request.query_params)
+        
+        headers = dict(request.headers)
+        headers.pop("host", None)
+        
+        headers["Accept-Encoding"] = "gzip, deflate"
+        
+        response = await http_client.request(
+            method=request.method,
+            url=target_url,
+            params=params,
+            headers=headers,
+        )
+        
+        response_headers = dict(response.headers)
+        
+        response_headers.pop("content-encoding", None)
+        
+        if ENABLE_CACHE and request.method == "GET" and response.status_code == 200:
+            cache_key = generate_cache_key(request, f"images/{path}")
+            cache.set(cache_key, (response.content, response.status_code, response_headers))
+        
+        return Response(
+            content=response.content,
+            status_code=response.status_code,
+            headers=response_headers,
+        )
+        
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503, 
+            detail=f"error request: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"error: {str(e)}"
+        )
 
 @router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def proxy_endpoint(request: Request, path: str):

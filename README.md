@@ -34,6 +34,7 @@ pip install -r requirements.txt
 3. Настройте переменные окружения, создав файл `.env` в корне проекта:
 ```
 TARGET_API_BASE_URL=https://api.themoviedb.org/3
+TARGET_IMAGE_API_BASE_URL=https://image.tmdb.org/t/p
 ENABLE_CACHE=true
 CACHE_TTL=300
 CACHE_CLEANUP_INTERVAL=60
@@ -58,6 +59,18 @@ GET http://localhost:8000/TMDBProxy/movie/popular?api_key=your_tmdb_api_key_here
 ```
 
 Этот запрос будет перенаправлен на `https://api.themoviedb.org/3/movie/popular?api_key=your_tmdb_api_key_here`.
+
+### Доступ к изображениям TMDB
+
+Сервис также поддерживает проксирование запросов к изображениям TMDB:
+
+```
+GET http://localhost:8000/TMDBProxy/images/w780/example_image_path.jpg
+```
+
+Этот запрос будет перенаправлен на `https://image.tmdb.org/t/p/w780/example_image_path.jpg`.
+
+Доступны различные размеры изображений (например, w500, w780, original), которые можно указать в пути запроса.
 
 ### Кэширование
 
